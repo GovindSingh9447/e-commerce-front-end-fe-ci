@@ -1,0 +1,57 @@
+name: Build and Push to Docker-Hub
+
+on:
+  push:
+    branches:
+      - fe-ci
+    # paths:
+    #   - .github/**
+    #   - simpleapp/**
+
+jobs:
+  build:
+    name: Build Docker Image and Push into Docker-Hub
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/e-commerce-front-end:${{ github.sha }}
+
+      - name: The current paths
+        run:
+          echo $PWD
+      - name: Checkout GitOps
+        uses: actions/checkout@v3
+        with:
+          repository: TryToLearnProgramming/gitops
+          path: ./gitops
+          ref: k-argo
+          token: ${{ secrets.REPO_PAT }}
+      
+      - name: update kustomization in gitops
+        run:  |
+          cd gitops
+          sed -Ei "/\-\ name\:\ sami203\/e\-commerce\-front\-end$/{n;s/\w+$/${{ github.sha }}/}" ./deployments/node-app/kustomization.yaml
+          git config --global user.email "samivivake@gmail.com"
+          git config --global user.name "gitops"
+          git add .
+          git commit -m "Deploying latest image"
+          git pull && git push
+       
